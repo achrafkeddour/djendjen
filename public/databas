@@ -1,0 +1,28 @@
+CREATE TABLE visitors (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  full_name VARCHAR(255) NOT NULL,
+  id_number VARCHAR(50) NOT NULL,
+  purpose VARCHAR(100) NOT NULL,
+  entry_time DATETIME NOT NULL,
+  exit_time DATETIME,
+  badge_code VARCHAR(50) UNIQUE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+
+CREATE TABLE users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(50) NOT NULL UNIQUE,
+  password VARCHAR(255) NOT NULL, -- Stocke le mot de passe en texte brut (non sécurisé)
+  role ENUM('admin', 'receptionist') DEFAULT 'receptionist',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+
+INSERT INTO users (username, password, role) VALUES ('admin', '0000', 'admin');
+
+INSERT INTO users (username, password, role) VALUES ('recep1', '1111', 'receptionist');
+INSERT INTO users (username, password, role) VALUES ('recep2', '2222', 'receptionist');
+INSERT INTO users (username, password, role) VALUES ('recep3', '3333', 'receptionist');
+INSERT INTO users (username, password, role) VALUES ('recep4', '4444', 'receptionist');
+INSERT INTO users (username, password, role) VALUES ('recep5', '5555', 'receptionist');
