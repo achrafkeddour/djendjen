@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestion des visiteurs - Port Djen Djen</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Custom CSS -->
+  <style>
+    body { background-color: #f8f9fa; }
+    .container { max-width: 1200px; }
+    .badge-code { font-size: 1.2em; font-weight: bold; color: #198754; animation: fadeIn 1s; }
+    .table th, .table td { vertical-align: middle; }
+    .search-bar { max-width: 300px; }
+    #login-section, #app-section { display: none; }
+    #app-section.active, #login-section.active { display: block; }
+    .alert-dismissible { position: fixed; top: 20px; right: 20px; z-index: 1000; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  </style>
+</head>
+<body>
+  <div class="container mt-5">
+    <!-- Section de connexion -->
+    <div id="login-section" class="card p-4 mx-auto active" style="max-width: 400px;">
+      <h2 class="text-center mb-4">Connexion</h2>
+      <form id="login-form">
+        <div class="mb-3">
+          <label for="username" class="form-label">Nom d'utilisateur</label>
+          <input type="text" class="form-control" id="username" required>
+        </div>
+        <div class="mb-3">
+          <label for="password" class="form-label">Mot de passe</label>
+          <input type="password" class="form-control" id="password" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Se connecter</button>
+        <p id="login-error" class="text-danger mt-2"></p>
+      </form>
+    </div>
+
+    <!-- Section principale de l'application -->
+    <div id="app-section" class="card p-4">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="text-center mb-0">Gestion des visiteurs - Port Djen Djen</h1>
+        <button id="logout-btn" class="btn btn-secondary">Déconnexion</button>
+      </div>
+
+      <!-- Formulaire d'enregistrement -->
+      <div class="mb-4">
+        <h3>Enregistrer un visiteur</h3>
+        <form id="visitor-form" class="row g-3">
+          <div class="col-md-4">
+            <label for="full_name" class="form-label">Nom complet</label>
+            <input type="text" class="form-control" id="full_name" required>
+          </div>
+          <div class="col-md-4">
+            <label for="id_number" class="form-label">Numéro de carte d'identité</label>
+            <input type="text" class="form-control" id="id_number" required>
+          </div>
+          <div class="col-md-4">
+            <label for="purpose" class="form-label">Motif de la visite</label>
+            <select class="form-select" id="purpose" required>
+              <option value="" disabled selected>Choisir...</option>
+              <option value="Livraison">Livraison</option>
+              <option value="Réunion">Réunion</option>
+              <option value="Inspection">Inspection</option>
+              <option value="Autre">Autre</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-success">Enregistrer</button>
+          </div>
+        </form>
+        <p id="badge-code" class="badge-code mt-3"></p>
+      </div>
+
+      <!-- Barre de recherche -->
+      <div class="mb-4">
+        <h3>Rechercher un visiteur</h3>
+        <input type="text" class="form-control search-bar" id="search-input" placeholder="Nom, ID ou code de badge">
+      </div>
+
+      <!-- Tableau de bord -->
+      <h3>Visiteurs actifs</h3>
+      <table class="table table-striped table-bordered">
+        <thead>
+          <tr>
+            <th>Nom complet</th>
+            <th>Numéro d'ID</th>
+            <th>Motif</th>
+            <th>Heure d'entrée</th>
+            <th>Code de badge</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="visitors-table"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Conteneur pour les alertes -->
+  <div id="alert-container"></div>
+
+  <!-- Bootstrap JS et JavaScript personnalisé -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const API_URL = '/api'; // URL relative, car servi par le serveur
+    let token = localStorage.getItem('token');
+
+    // Afficher une alerte Bootstrap
+    function showAlert(message, type = 'success') {
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type} alert-dismissible fade show`;
+      alert.role = 'alert';
+      alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      `;
+      document.getElementById('alert-container').appendChild(alert);
+      setTimeout(() => alert.remove(), 5000);
+    }
+
+    // Vérifier l'authentification au chargement
+    async function checkAuth() {
+      if (!token) {
+        showLogin();
+        return;
+      }
+      try {
+        const response = await fetch(`${API_URL}/check-auth`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          showApp();
+          loadVisitors();
+        } else {
+          localStorage.removeItem('token');
+          showLogin();
+        }
+      } catch (error) {
+        showLogin();
+      }
+    }
+
+    // Afficher la section de connexion
+    function showLogin() {
+      document.getElementById('login-section').classList.add('active');
+      document.getElementById('app-section').classList.remove('active');
+      token = null;
+      localStorage.removeItem('token');
+    }
+
+    // Afficher la section principale
+    function showApp() {
+      document.getElementById('login-section').classList.remove('active');
+      document.getElementById('app-section').classList.add('active');
+    }
+
+    // Gestion de la connexion
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const errorEl = document.getElementById('login-error');
+
+      try {
+        const response = await fetch(`${API_URL}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await response.json();
+        if (response.ok) {
+          token = data.token;
+          localStorage.setItem('token', token);
+          showApp();
+          loadVisitors();
+          showAlert('Connexion réussie !', 'success');
+        } else {
+          errorEl.textContent = data.error;
+        }
+      } catch (error) {
+        errorEl.textContent = 'Erreur de connexion au serveur.';
+      }
+    });
+
+    // Déconnexion
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      showLogin();
+      showAlert('Déconnexion réussie.', 'info');
+    });
+
+    // Enregistrer un visiteur
+    document.getElementById('visitor-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const full_name = document.getElementById('full_name').value;
+      const id_number = document.getElementById('id_number').value;
+      const purpose = document.getElementById('purpose').value;
+      const badgeEl = document.getElementById('badge-code');
+
+      try {
+        const response = await fetch(`${API_URL}/visitors`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ full_name, id_number, purpose })
+        });
+        const data = await response.json();
+        if (response.ok) {
+          badgeEl.textContent = `Badge du visiteur : ${data.badge_code} (À conserver par le visiteur)`;
+          document.getElementById('visitor-form').reset();
+          loadVisitors();
+          showAlert('Visiteur enregistré avec succès !', 'success');
+        } else {
+          badgeEl.textContent = `Erreur : ${data.error}`;
+        }
+      } catch (error) {
+        badgeEl.textContent = 'Erreur de connexion au serveur.';
+        showAlert('Erreur lors de l\'enregistrement.', 'danger');
+      }
+    });
+
+    // Charger les visiteurs actifs
+    async function loadVisitors(query = '') {
+      const url = query ? `${API_URL}/visitors/search?query=${encodeURIComponent(query)}` : `${API_URL}/visitors`;
+      try {
+        const response = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const visitors = await response.json();
+        const tableBody = document.getElementById('visitors-table');
+        tableBody.innerHTML = '';
+        visitors.forEach(visitor => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${visitor.full_name}</td>
+            <td>${visitor.id_number}</td>
+            <td>${visitor.purpose}</td>
+            <td>${new Date(visitor.entry_time).toLocaleString('fr-FR')}</td>
+            <td>${visitor.badge_code}</td>
+            <td><button class="btn btn-danger btn-sm" onclick="exitVisitor(${visitor.id})">Sortie</button></td>
+          `;
+          tableBody.appendChild(row);
+        });
+      } catch (error) {
+        console.error('Erreur lors du chargement des visiteurs:', error);
+        showAlert('Erreur lors du chargement des visiteurs.', 'danger');
+      }
+    }
+
+    // Enregistrer la sortie d'un visiteur
+    async function exitVisitor(id) {
+      try {
+        const response = await fetch(`${API_URL}/visitors/${id}/exit`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (response.ok) {
+          loadVisitors();
+          showAlert(data.message, 'success');
+        } else {
+          showAlert(data.error, 'danger');
+        }
+      } catch (error) {
+        showAlert('Erreur de connexion au serveur.', 'danger');
+      }
+    }
+
+    // Recherche en temps réel
+    document.getElementById('search-input').addEventListener('input', (e) => {
+      loadVisitors(e.target.value);
+    });
+
+    // Vérifier l'authentification au chargement
+    checkAuth();
+  </script>
+</body>
+</html>
